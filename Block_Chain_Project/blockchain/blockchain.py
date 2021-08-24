@@ -7,13 +7,16 @@ from collections import OrderedDict
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
+from uuid import uuid4
 
 
 MINING_SENDER = "The Blockchain"
+MINING_REWARD = 1
 
 class Blockchain:
     def __init__(self):
         self.transactions = []
+        self.node_id = str(uuid4()).replace('-','')
         self.chain = []
         self.create_block(0, '00') #create genesis block
 
@@ -27,6 +30,7 @@ class Blockchain:
         }
         self.transactions = [] #reset current list of transactions
         self.chain.append(block)
+        return block
 
     def verify_transaction_signature(self, sender_public_key, signature, transaction):
         public_key = RSA.importKey(binascii.unhexlify(sender_public_key))
@@ -39,9 +43,15 @@ class Blockchain:
             return False
 
 
+    def proof_of_word(self):
+        return 12345
+
+    def hash(self, block):
+        return 'abc'
+
+
     def submit_transaction(self, sender_public_key, recipient_public_key, signature, amount):
-        # TODO: reward the miner
-        # TODO: signature validation
+
 
         transaction = OrderedDict({
             'sender_public_key': sender_public_key,
@@ -49,7 +59,7 @@ class Blockchain:
             'amount':amount
         })
 
-        signature_verification = self.verify_transaction_signature(sender_public_key, signature, transaction) #verify the signature
+
 
 
         if sender_public_key == MINING_SENDER: #reward for mining a block
@@ -57,6 +67,8 @@ class Blockchain:
             return len(self.chain)
 
         else: #normal transaction from 1 wallet to another
+            signature_verification = self.verify_transaction_signature(sender_public_key, signature, transaction)  # verify the signature
+
             if signature_verification:
                 self.transactions.append(transaction)
                 return len(self.chain) + 1
@@ -80,6 +92,51 @@ CORS(app)
 @app.route('/') #same idea as a route in ASP.NET
 def index():
     return render_template('./index.html') #to translate to ASP.NET, this is a controller that renders a view called index.html
+
+
+@app.route('/transactions/get')
+def get_transactions():
+    transactions = blockchain.transactions
+    response = {'transactions': transactions}
+    return jsonify(response), 200 #response needs to be rendered in JSON because we are using java script for the front end
+
+
+@app.route('/chain')
+def get_chain():
+    response = {
+        'chain': blockchain.chain,
+        'length':len(blockchain.chain)
+    }
+
+    return response, 200
+
+
+
+
+
+@app.route('/mine')
+def mine():
+    nonce = blockchain.proof_of_word()
+
+    blockchain.submit_transaction(sender_public_key = MINING_SENDER, recipient_public_key=blockchain.node_id, signature='', amount= MINING_REWARD)
+
+    last_block = blockchain.chain[-1] #access last (most recent) block
+    previous_hash = blockchain.hash(last_block)
+
+    block = blockchain.create_block(nonce, previous_hash)
+
+    response = {
+        'message': 'New block created',
+        'block_number': block['block_number'],
+        'transactions': block['transactions'],
+        'nonce': block['nonce'],
+        'previous_hash': block['previous_hash']
+    }
+
+    return jsonify(response), 200
+
+
+
 
 
 @app.route('/transactions/new', methods=['POST'])
