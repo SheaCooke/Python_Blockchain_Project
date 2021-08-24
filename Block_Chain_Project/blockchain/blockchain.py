@@ -10,6 +10,8 @@ from Crypto.Hash import SHA
 from uuid import uuid4
 import json
 import hashlib
+import requests
+from urllib.parse import urlparse
 
 
 MINING_SENDER = "The Blockchain"
@@ -21,7 +23,20 @@ class Blockchain:
         self.transactions = []
         self.node_id = str(uuid4()).replace('-','')
         self.chain = []
+        self.nodes = set()
         self.create_block(0, '00') #create genesis block
+
+
+    def register_node(self, node_url):
+        parsed_url = urlparse(node_url)
+        if parsed_url.netloc: #check network location part
+            self.nodes.add(parsed_url.netloc)
+        elif parsed_url.path:
+            self.nodes.add(parsed_url.path)
+        else:
+            raise ValueError('Invalid URL')
+
+
 
     def create_block(self, nonce, previous_hash): # add block of transactions to block chain
         block = {
@@ -75,6 +90,60 @@ class Blockchain:
         h.update(block_string)
         return h.hexdigest()
 
+    def resolve_conflicts(self):
+
+        neighbours = self.nodes
+        new_chain = None
+
+        max_length = len(self.chain) # used to measure against other chains stored in the different nodes
+
+        for node in neighbours: #iterate through all other nodes
+            response = requests.get('http://' + node + '/chain')
+            if response.status_code == 200: #if succesful
+                length = response.json()['length']#get json from response
+                chain = response.json()['chain']
+
+                if length > max_length and self.valid_chain(chain): #compare length of the chain stored in the current node to the one that is currently being iterated over, and makes sure it is valid
+                    #overrite your chain with the longer one
+                    max_length = length
+                    new_chain = chain
+
+        if new_chain: # make sure new_chain is no longer null
+            self.chain = new_chain
+            return True
+
+        return False
+
+
+
+
+
+    def valid_chain(self, chain):
+        #start at block 2, first block will always be the genesis block and the previous hash will always be all 0s
+        # genesis block + first block, len = 2
+        last_block = chain[0]
+        current_index = 1 #starting at the 2nd block (first after genesis)
+
+        while current_index < len(chain): #iterate over blocks in the chain
+            block = chain[current_index]
+
+            if block['previous_hash'] != self.hash(last_block):#make sure hash has correct previous hash value
+                return False
+
+            transactions = block['transactions'] [:-1] #get all transactions on block chain except for the last one, the last block will be the reward transaction and does not need to be validated
+            transaction_element = ['sender_public_key', 'recipient_public_key', 'amount']
+            transactions = [OrderedDict((k, transaction[k]) for k in transaction_element) for transaction in transactions]
+            if not self.valid_proof(transactions, block['previous_hash'], block['nonce'], MINNING_DIFFICULTY): #validate nonce in block
+                return False
+
+            last_block = block
+            current_index += 1
+
+        return True
+
+
+
+
 
     def submit_transaction(self, sender_public_key, recipient_public_key, signature, amount):
 
@@ -118,6 +187,11 @@ CORS(app)
 @app.route('/') #same idea as a route in ASP.NET
 def index():
     return render_template('./index.html') #to translate to ASP.NET, this is a controller that renders a view called index.html
+
+
+@app.route('/configure')
+def configure():
+    return render_template('./configure.html')
 
 
 @app.route('/transactions/get')
@@ -188,8 +262,49 @@ def new_transaction():
 
 
 
+@app.route('/nodes/get')
+def get_nodes():
+    nodes = list(blockchain.nodes) #get list of all nodes from the set
+    response = {'nodes': nodes}
+    return jsonify(response), 200
 
 
+@app.route('/nodes/resolve', methods=['GET'])
+def consensus():
+    replaced = blockchain.resolve_conflicts()
+
+    if replaced:
+        response = {
+            'message': 'Our chain was replaced',
+            'new_chain': blockchain.chain
+        }
+    else:
+        response = {
+            'message': 'Our chain is authoritative',
+            'chain': blockchain.chain
+        }
+    return jsonify(response), 200
+
+
+
+@app.route('/nodes/register', methods=['POST'])
+def register_node(): #go through UI to register list of nodes
+    values = request.form #get values from html form that was submited to this route
+    nodes = values.get('nodes').replace(' ', '').split(',')#based on expected values, stores IPs and port numbers
+
+    if nodes is None:
+        return 'Error: Bad Request. Please supply a valid node list.', 400 #400 = bad request
+
+    for node in nodes:# add node to block chain
+        blockchain.register_node(node)
+
+    response = {
+
+        'message': 'Nodes have been added',
+        'total_nodes': [node for node in blockchain.nodes]
+    }
+
+    return jsonify(response), 200 #return response to user on the UI
 
 
 
