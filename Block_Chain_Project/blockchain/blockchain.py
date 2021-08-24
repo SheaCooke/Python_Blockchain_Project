@@ -8,10 +8,13 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
 from uuid import uuid4
+import json
+import hashlib
 
 
 MINING_SENDER = "The Blockchain"
 MINING_REWARD = 1
+MINNING_DIFFICULTY = 2
 
 class Blockchain:
     def __init__(self):
@@ -43,11 +46,34 @@ class Blockchain:
             return False
 
 
-    def proof_of_word(self):
-        return 12345
+    def valid_proof(self, transactions, last_hash, nonce, difficulty = MINNING_DIFFICULTY):#difficulty = number of 0s we are looking for at start of hash
+        guess = (str(transactions) + str(last_hash) + str(nonce)).encode('utf8')
+        h = hashlib.new('sha256')
+        h.update(guess)
+        guess_hash = h.hexdigest() #hash of 3 variables from guess
+        return guess_hash[:difficulty] == '0'* difficulty #determine if hash is valid proof, check for proper number of 0s, get first {difficulty} numbers of hash
+        #true if valid proof
+
+
+
+
+    def proof_of_word(self): #objective is to find a nonce that meets criteria (target), hash w/ specific amount of 0s
+
+        nonce = 0 #will be increamented by 1 until a hash is produced that meets criteria
+
+        last_block = self.chain[-1]
+        last_hash = self.hash(last_block)
+
+        while self.valid_proof(self.transactions, last_hash, nonce) is False:
+            nonce += 1
+
+        return nonce
 
     def hash(self, block):
-        return 'abc'
+        block_string = json.dumps(block, sort_keys=True).encode('utf8') #ensure the dictionary is ordered, avoid inconsistent hashes
+        h = hashlib.new('sha256')
+        h.update(block_string)
+        return h.hexdigest()
 
 
     def submit_transaction(self, sender_public_key, recipient_public_key, signature, amount):
