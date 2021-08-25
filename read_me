@@ -1,0 +1,15 @@
+The web-based program simulates the interaction between users and various nodes on the bitcoin blockchain network.
+Before a user runs the program, they should create various nodes in pycharm with script paths to blockchain.py.
+These nodes serve the same purpose as the computers that have been dedicated to the bitcoin blockchain network. 
+-	They allow for the creation of a peer-to-peer network that constantly validates the immutable ledger.
+-	Make the blockchain resilient to hacking attempts 
+A user should also use pycharm to create some nodes that represent someone interacting with the blockchain network by setting the script paths of the newly created nodes to blockchain_client.py. 
+
+Once the user runs all the nodes that simulate the dedicated computers for the blockchain as well as the nodes that represent any users, they should follow the following steps:
+-	Select the generate wallet button on each user node. This will generate a public and private key that the user will use for transactions with others. 
+-	Go to each blockchain node and add the other nodes under configuration. There is currently no functionality to do this automatically, but this step is required for the various nodes that make up the blockchain to be able to talk to each other and maintain the integrity of the immutable ledger. 
+-	Back in the user nodes, navigate to make a transaction and enter the required information. Once the user submits the transaction, navigate to the blockchain node at port 5001, select the top refresh button. The transaction will then appear in the table and must be mined to be added to the block chain.
+-	Once the mine button is selected, the program will increment a nonce value by 1 until it finds a hashed value that has a predetermined amount of leading 0s. Once this is accomplished, the user will be rewarded with a coin, and both transactions will be added to the blockchain. 
+-	The user should then navigate to a different blockchain node and select the lower refresh button. Assuming the nodes have been properly linked in the configuration section, the ledger should be replicated on that page. 
+
+*As in the bitcoin blockchain network. If 2 different nodes disagree on what the immutable ledger should be, the longer ledger will be viewed as correct. If all ledgers are the same length, then the correct one will be selected based on the ledger stored by the majority of nodes. 
